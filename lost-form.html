@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Lost & Found - Campus Connect</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+  <header class="gradient-header flex items-center justify-between px-8 py-6 bg-gradient-to-r from-blue-600 to-purple-500 text-white rounded-b-2xl mb-8">
+    <h1 class="text-3xl font-bold">Lost & Found</h1>
+    <button id="loginBtn" class="login-btn bg-white text-blue-700 font-semibold px-6 py-2 rounded-lg shadow hover:bg-blue-100 transition">Login</button>
+  </header>
+
+  <!-- Login Modal -->
+  <div id="loginModal" class="modal fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50" style="display:none;">
+    <div class="modal-content bg-white rounded-xl shadow-lg p-8 relative w-80 text-center">
+      <span class="close absolute right-4 top-2 text-2xl text-gray-500 cursor-pointer" id="closeModal">&times;</span>
+      <h2 class="text-xl font-bold mb-2">Login</h2>
+      <p class="mb-4">Select your login type:</p>
+      <div class="login-options flex justify-center gap-4">
+        <button class="student-login bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 font-semibold">Student Login</button>
+        <button class="admin-login bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 font-semibold">Admin Login</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Lost & Found Form (hidden for students) -->
+  <section id="lostFormSection" class="bg-gray-50 dark:bg-gray-900 py-12 px-4 md:px-8">
+    <div class="max-w-3xl mx-auto bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-lg">
+      <h2 class="text-3xl font-bold text-center text-primary mb-6">📦 Lost & Found</h2>
+
+      <form id="lostForm" class="space-y-5">
+        <div>
+          <label for="title" class="block font-semibold mb-1">Item Title</label>
+          <input type="text" id="title" placeholder="e.g. Black Wallet" required
+            class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        </div>
+
+        <div>
+          <label for="description" class="block font-semibold mb-1">Description</label>
+          <textarea id="description" placeholder="Where you lost it, color, etc..." required rows="4"
+            class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+        </div>
+
+        <div>
+          <label for="contact" class="block font-semibold mb-1">Contact Info</label>
+          <input type="text" id="contact" placeholder="Phone number / Email" required
+            class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        </div>
+
+        <div>
+          <label for="image" class="block font-semibold mb-1">Upload Image</label>
+          <input type="file" id="image" accept="image/*" required
+            class="w-full px-4 py-2 bg-white dark:bg-gray-700 border border-dashed border-gray-400 dark:border-gray-600 rounded-lg cursor-pointer file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:bg-blue-600 file:text-white hover:file:bg-blue-700" />
+        </div>
+
+        <div class="text-center">
+          <button type="submit"
+            class="bg-primary hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-semibold transition-all">📤 Post Item</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- List of Posted Items -->
+    <div id="posts" class="mt-12 grid md:grid-cols-2 gap-6 max-w-5xl mx-auto"></div>
+  </section>
+
+
+  <!-- Firebase SDK -->
+  <script type="module" src="./script.js" src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
+    // Firebase import
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import {
+  getDatabase, ref, push, onValue
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+import {
+  getStorage, ref as sRef, uploadBytes, getDownloadURL
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
+
+// ✅ Paste your Firebase config below
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+  databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_PROJECT_ID.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const storage = getStorage(app);
+
+const lostForm = document.getElementById('lostForm');
+const posts = document.getElementById('posts');
+
+lostForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  const title = document.getElementById('title').value;
+  const description = document.getElementById('description').value;
+  const contact = document.getElementById('contact').value;
+  const imageFile = document.getElementById('image').files[0];
+
+  if (!imageFile) return alert('Please select an image');
+
+  const storageRef = sRef(storage, 'lost/' + imageFile.name);
+  await uploadBytes(storageRef, imageFile);
+  const imageUrl = await getDownloadURL(storageRef);
+
+  await push(ref(db, 'lostItems'), {
+    title, description, contact, image: imageUrl, time: Date.now()
+  });
+
+  lostForm.reset();
+});
+
+// Listen for posts
+onValue(ref(db, 'lostItems'), (snapshot) => {
+  posts.innerHTML = '';
+  const data = snapshot.val();
+  if (!data) return;
+
+  const items = Object.values(data).sort((a, b) => b.time - a.time);
+  items.forEach(item => {
+    const div = document.createElement('div');
+    div.className = 'border p-4 rounded shadow bg-white';
+    div.innerHTML = `
+      <img src="${item.image}" alt="" class="h-48 object-cover w-full rounded mb-2" />
+      <h3 class="text-xl font-bold">${item.title}</h3>
+      <p>${item.description}</p>
+      <p class="text-sm text-gray-500">Contact: ${item.contact}</p>
+    `;
+    posts.appendChild(div);
+  });
+});
+
+    // Login Modal Logic
+    const loginBtn = document.getElementById('loginBtn');
+    const loginModal = document.getElementById('loginModal');
+    const closeModal = document.getElementById('closeModal');
+    const studentLoginBtn = document.querySelector('.student-login');
+    const adminLoginBtn = document.querySelector('.admin-login');
+    const lostFormSection = document.getElementById('lostFormSection');
+
+    loginBtn.onclick = function() {
+      loginModal.style.display = "flex";
+    }
+    closeModal.onclick = function() {
+      loginModal.style.display = "none";
+    }
+    window.onclick = function(event) {
+      if (event.target == loginModal) {
+        loginModal.style.display = "none";
+      }
+    }
+
+    // Student Login: reload page and hide form
+    studentLoginBtn.onclick = function() {
+      loginModal.style.display = "none";
+      lostFormSection.style.display = "none";
+      location.reload();
+    }
+
+    // Admin Login: show form
+    adminLoginBtn.onclick = function() {
+      loginModal.style.display = "none";
+      lostFormSection.style.display = "block";
+    }
+
+    // By default, hide form until login
+    lostFormSection.style.display = "none";
+
+  <!-- Firebase Admin SDK (for exporting to Excel) -->
+    // Install dependencies: npm install firebase-admin xlsx
+const admin = require('firebase-admin');
+const XLSX = require('xlsx');
+
+// Initialize Firebase Admin SDK
+admin.initializeApp({
+  credential: admin.credential.cert(require('./serviceAccountKey.json')),
+  databaseURL: "https://console.firebase.google.com/u/0/project/campusconnect-1ded1/overview"
+});
+
+const adminDb = admin.database();
+
+adminDb.ref('lostItems').once('value', snapshot => {
+  const data = snapshot.val();
+  if (!data) return console.log('No data found.');
+
+  // Convert data to array
+  const items = Object.values(data);
+
+  // Create worksheet and workbook
+  const ws = XLSX.utils.json_to_sheet(items);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'LostItems');
+
+  // Write to Excel file
+  XLSX.writeFile(wb, 'lost_items.xlsx');
+  console.log('Exported to lost_items.xlsx');
+});
+
+  const supabase = window.supabase.createClient(
+    'https://YOUR_PROJECT.supabase.co',  // Replace with your Project URL
+    'YOUR_ANON_PUBLIC_KEY'               // Replace with your anon key
+  );
+
+
+  const eventForm = document.getElementById('postEventForm');
+  eventForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const title = eventForm.title.value;
+    const date = eventForm.date.value;
+    const desc = eventForm.desc.value;
+
+    const { data, error } = await supabase
+      .from('events')
+      .insert([{ title, date, desc }]);
+
+    if (error) {
+      alert('Error saving event: ' + error.message);
+    } else {
+      alert('Event saved!');
+      eventForm.reset();
+    }
+  });
+
+  </script>
+  
+</body>
+</html>
